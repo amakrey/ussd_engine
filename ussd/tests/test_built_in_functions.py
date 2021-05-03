@@ -1,17 +1,16 @@
+from ussd_version.version import VERSION
 from ussd.tests import UssdTestCase
-from ussd import VERSION
 
 
 class TestScreenUsing(UssdTestCase.BaseUssdTestCase):
-
     validate_ussd = False
 
     def get_ussd_client(self):
         return self.ussd_client(
             generate_customer_journey=False,
             extra_payload={
-                "customer_journey_conf":
-                    "teasting_using_built_in_functions.yml"
+                'journey_name': "sample_journey",
+                'journey_version': "testing_using_built_in_functions"
             }
         )
 

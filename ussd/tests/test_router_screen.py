@@ -1,5 +1,4 @@
 from ussd.tests import UssdTestCase
-from ussd.core import ussd_session
 
 
 class TestRouterHandler(UssdTestCase.BaseUssdTestCase):
@@ -8,15 +7,20 @@ class TestRouterHandler(UssdTestCase.BaseUssdTestCase):
             router_options=['This field is required.']
         ),
         invalid_router_2=dict(
-            router_options=dict(
-                next_screen=['This field is required.']
-            )
+            router_options={
+                0: dict(
+                    next_screen=['This field is required.']
+                ),
+                1: dict(
+                    expression=['This field is required.']
+                )
+
+            }
         )
     )
 
-    @staticmethod
-    def add_phone_number_status_in_session(ussd_client):
-        session = ussd_session(ussd_client.session_id)
+    def add_phone_number_status_in_session(self, ussd_client):
+        session = self.ussd_session(ussd_client.session_id)
 
         session["phone_numbers"] = {
             "203": ["registered"],
@@ -77,7 +81,6 @@ class TestRouterHandler(UssdTestCase.BaseUssdTestCase):
         )
 
     def test_router_option_with_dict_loop(self):
-
         ussd_client = self.ussd_client(phone_number=206)
 
         self.assertEqual(

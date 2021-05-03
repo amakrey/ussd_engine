@@ -1,6 +1,7 @@
 from setuptools import setup, find_packages
 import os
-from ussd import VERSION
+from ussd_version.version import VERSION
+from os import path
 
 
 def _strip_comments(l):
@@ -32,15 +33,23 @@ def reqs(*f):
     """
     return [req for subreq in _reqs(*f) for req in subreq]
 
+
+this_directory = path.abspath(path.dirname(__file__))
+with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
+
 setup(
-    name='ussd_airflow',
+    name='ussd_airflow_engine',
     version=VERSION,
     packages=find_packages(exclude=('ussd_airflow',)),
-    url='https://github.com/mwaaas/ussd_airflow',
+    url='https://github.com/ussd-airflow/ussd_engine',
     install_requires=reqs('default.txt'),
     include_package_data=True,
     license='MIT',
     author='Mwas',
+    maintainer="mwas",
     author_email='mwasgize@gmail.com',
-    description='Ussd Airflow Library'
+    description='Ussd Airflow Library',
+    long_description=long_description,
+    long_description_content_type='text/markdown'
 )

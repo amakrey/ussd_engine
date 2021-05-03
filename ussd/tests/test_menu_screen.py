@@ -1,10 +1,9 @@
 """
 This module is involved in testing Menu screen only
 """
-from ussd.tests import UssdTestCase
-from ussd.core import ussd_session
 from collections import OrderedDict
-from django.test import override_settings
+
+from ussd.tests import UssdTestCase
 
 
 class TestMenuHandler(UssdTestCase.BaseUssdTestCase):
@@ -48,42 +47,49 @@ class TestMenuHandler(UssdTestCase.BaseUssdTestCase):
 
     validation_error_message = dict(
         choose_meal=dict(
-            non_field_errors=[
+            _schema=[
                 'options field is required or items is required'
             ]
         ),
         types_of_food=dict(
             text=['This field is required.']
         ),
-        types_of_fruit=dict(
-            options=dict(
-                next_screen=["invalid_screen is missing in ussd journey"]
-            )
-        ),
-        types_of_drinks=dict(
-            options=dict(
-                next_screen=['This field is required.']
-            )
-        ),
-        rice_chosen=dict(
-            options=dict(
-                next_screen=['This field is required.']
-            )
-        ),
+        types_of_fruit={
+            "options": {
+                0: dict(
+                    next_screen=["invalid_screen is missing in ussd journey"]
+                )
+            }
+        },
+        types_of_drinks={
+            "options": {
+                0: dict(
+                    next_screen=['This field is required.']
+                )
+            }
+        },
+        rice_chosen={
+            "options": {
+                0: dict(
+                    next_screen=['This field is required.']
+                ),
+                1: dict(
+                    text=['This field is required.']
+                )
+            }
+        },
         types_of_vegetables=dict(
             items=dict(
                 value=['This field is required.'],
                 session_key=['This field is required.'],
                 next_screen=['This field is required.'],
-                with_items=['with_items or with_dict field is required'],
-                with_dict=['with_items or with_dict field is required']
+                _schema=['with_items or with_dict field is required'],
             )
         )
     )
 
-    @staticmethod
-    def add_vegetable_list_in_session(ussd_client):
-        session = ussd_session(ussd_client.session_id)
+    def add_vegetable_list_in_session(self, ussd_client):
+        session = self.ussd_session(ussd_client.session_id)
         session["vegetables_list"] = [
             "Sukuma",
             "Carrot",
@@ -127,19 +133,16 @@ class TestMenuHandler(UssdTestCase.BaseUssdTestCase):
         # choose 0 to go back
         self.assertEqual(self.choose_meal, ussd_client.send('0'))
 
-    @override_settings(
-        USSD_INDEX_FORMAT='& '
-    )
     def test_index_format(self):
         # Test for menu options
-        ussd_client = self.ussd_client()
+        ussd_client = self.ussd_client(extra_payload=dict(menu_index_format="& "))
         response = ussd_client.send('')
         expected_text = self.choose_meal
         expected_text = expected_text.replace('. ', '& ')
         self.assertEqual(expected_text, response)
 
         # Test for list options
-        ussd_client = self.ussd_client()
+        ussd_client = self.ussd_client(extra_payload=dict(menu_index_format="& "))
         self.add_vegetable_list_in_session(ussd_client)
 
         # dial in
@@ -217,9 +220,9 @@ class TestMenuHandler(UssdTestCase.BaseUssdTestCase):
         # choose one ot test native dict items
         response = ussd_client.send('1')
         for i in (
-            "a for apple\n",
-            "b for boy\n",
-            "c for cat\n"
+                "a for apple\n",
+                "b for boy\n",
+                "c for cat\n"
         ):
             self.assertRegex(response, i)
 
@@ -391,12 +394,12 @@ class TestMenuHandler(UssdTestCase.BaseUssdTestCase):
 
     def test_routing_option(self):
         ussd_client = self.ussd_client(phone_number='200')
-        ussd_client.send('') # dial in
-        ussd_client.send('1') # choose food
+        ussd_client.send('')  # dial in
+        ussd_client.send('1')  # choose food
 
         self.assertEqual(
             "screen_one",
-            ussd_client.send('3') # choose option with routing
+            ussd_client.send('3')  # choose option with routing
         )
 
         ussd_client = self.ussd_client(phone_number='201')
@@ -405,5 +408,5 @@ class TestMenuHandler(UssdTestCase.BaseUssdTestCase):
 
         self.assertEqual(
             "screen_two",
-            ussd_client.send('3') # choose option with routing
+            ussd_client.send('3')  # choose option with routing
         )

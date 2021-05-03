@@ -1,35 +1,37 @@
-from ussd.core import UssdHandlerAbstract, load_yaml
-from rest_framework import serializers
-from ussd.screens.serializers import NextUssdScreenSerializer
-import staticconf
+from ussd.core import UssdHandlerAbstract
+from ussd.screens.schema import UssdBaseScreenSchema, NextUssdScreenSchema, PaginationConfigSchema
 from ussd.graph import Vertex, Link
 import typing
+from marshmallow import Schema, fields, validate
 
 
-class VariableDefinition(serializers.Serializer):
-    file = serializers.CharField()
-    namespace = serializers.CharField(max_length=100)
+class VariableDefinitionSchema(Schema):
+    file = fields.Str(required=True)
+    namespace = fields.Str(required=True)
 
 
-class ValidateResposeSerialzier(serializers.Serializer):
-    expression = serializers.CharField(max_length=255)
+class ValidateResponseSerializerSchema(Schema):
+    expression = fields.Str()
 
 
-class UssdReportSessionSerializer(serializers.Serializer):
-    session_key = serializers.CharField(max_length=100)
-    validate_response = serializers.ListField(
-        child=ValidateResposeSerialzier()
-    )
-    request_conf = serializers.DictField()
+class RetryMechanismSchema(Schema):
+    max_retries = fields.Integer(required=True)
 
 
+class UssdReportSessionSchema(Schema):
+    session_key = fields.Str(validate=validate.Length(max=100), required=True)
+    validate_response = fields.List(fields.Nested(ValidateResponseSerializerSchema), required=True)
+    request_conf = fields.Dict(required=True)
+    retry_mechanism = fields.Nested(RetryMechanismSchema, required=False)
+    async_parameters = fields.Dict(required=False)
 
-class InitialScreenSerializer(NextUssdScreenSerializer):
-    variables = VariableDefinition(required=False)
-    create_ussd_variables = serializers.DictField(default={})
-    default_language = serializers.CharField(required=False,
-                                             default="en")
-    ussd_report_session = UssdReportSessionSerializer(required=False)
+
+class InitialScreenSchema(UssdBaseScreenSchema, NextUssdScreenSchema):
+    variables = fields.Nested(VariableDefinitionSchema, required=False)
+    create_ussd_variables = fields.Dict(default={}, required=False)
+    default_language = fields.Str(required=False, default="en")
+    ussd_report_session = fields.Nested(UssdReportSessionSchema, required=False)
+    pagination_config = fields.Nested(PaginationConfigSchema, required=False)
 
 
 class InitialScreen(UssdHandlerAbstract):
@@ -121,7 +123,7 @@ class InitialScreen(UssdHandlerAbstract):
     """
     screen_type = "initial_screen"
 
-    serializer = InitialScreenSerializer
+    serializer = InitialScreenSchema
 
     def get_next_screens(self) -> typing.List[Link]:
         next_screens = self.screen_content['next_screen']
@@ -133,8 +135,6 @@ class InitialScreen(UssdHandlerAbstract):
     def handle(self):
 
         if isinstance(self.screen_content, dict):
-            if self.screen_content.get('variables'):
-                self.load_variable_files()
 
             # create ussd variables defined int the yaml
             self.create_variables()
@@ -162,21 +162,6 @@ class InitialScreen(UssdHandlerAbstract):
                                               lazy_evaluating=True,
                                               session=self.ussd_request.session
                                               )
-
-    def load_variable_files(self):
-        variable_conf = self.screen_content['variables']
-        file_path = variable_conf['file']
-        namespace = variable_conf['namespace']
-
-        # check if it has been loaded
-        if not namespace in \
-                staticconf.config.configuration_namespaces:
-            load_yaml(file_path, namespace)
-
-        self.ussd_request.session.update(
-            staticconf.config.configuration_namespaces[namespace].
-            configuration_values
-        )
 
     def set_language(self):
         self.ussd_request.session['default_language'] = \

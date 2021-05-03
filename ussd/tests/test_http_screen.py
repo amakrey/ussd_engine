@@ -1,14 +1,8 @@
-from ussd.tests import UssdTestCase
 from unittest import mock
-from django.http.response import JsonResponse, HttpResponse
-from django.test.utils import override_settings
+from ussd.tests import UssdTestCase
+from ussd.tests.utils import MockResponse
 
 
-@override_settings(
-        CELERY_EAGER_PROPAGATES_EXCEPTIONS=True,
-        CELERY_ALWAYS_EAGER=True,
-        BROKER_BACKEND='memory'
-    )
 class TestHttpScreen(UssdTestCase.BaseUssdTestCase):
     validation_error_message = dict(
         screen_name="Screen not available",
@@ -19,17 +13,17 @@ class TestHttpScreen(UssdTestCase.BaseUssdTestCase):
         ),
         http_screen_invalid_method=dict(
             http_request=dict(
-                method=['"done" is not a valid choice.'],
+                method=['Must be one of: post, get, put, delete.'],
             )
         ),
         http_screen_invalid_synchronous=dict(
-            synchronous=['"not boolean" is not a valid boolean.']
+            synchronous=['Not a valid boolean.']
         )
     )
 
     @mock.patch("ussd.core.requests.request")
     def test(self, mock_request):
-        mock_response = JsonResponse({"balance": 250})
+        mock_response = MockResponse({"balance": 250})
         mock_request.return_value = mock_response
         ussd_client = self.ussd_client()
 
@@ -73,7 +67,7 @@ class TestHttpScreen(UssdTestCase.BaseUssdTestCase):
     @mock.patch("ussd.screens.http_screen.http_task")
     @mock.patch("ussd.tasks.requests.request")
     def test_async_workflow(self, mock_request, mock_http_task):
-        mock_response = JsonResponse({"balance": 257})
+        mock_response = MockResponse({"balance": 257})
         mock_request.return_value = mock_response
 
         ussd_client = self.ussd_client()
@@ -91,7 +85,7 @@ class TestHttpScreen(UssdTestCase.BaseUssdTestCase):
 
     @mock.patch("ussd.core.requests.request")
     def test_json_decoding(self, mock_request):
-        mock_response = HttpResponse("Balance is 257")
+        mock_response = MockResponse("Balance is 257")
         mock_request.return_value = mock_response
 
         ussd_client = self.ussd_client()
@@ -103,5 +97,3 @@ class TestHttpScreen(UssdTestCase.BaseUssdTestCase):
             "balance is  and full content Balance is 257.\n",
             ussd_client.send('')
         )
-
-

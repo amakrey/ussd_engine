@@ -1,4 +1,4 @@
-from ussd import VERSION
+from ussd_version.version import VERSION
 from ussd.core import register_function
 
 

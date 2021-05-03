@@ -1,32 +1,23 @@
-from ussd.core import UssdHandlerAbstract, UssdResponse
-from ussd.screens.serializers import UssdContentBaseSerializer, \
-    UssdTextSerializer, NextUssdScreenSerializer, MenuOptionSerializer
-from django.utils.encoding import force_text
+from ussd.core import UssdResponse
+from ussd.utils.encoding import force_text
 import re
-from rest_framework import serializers
 from ussd.screens.menu_screen import MenuScreen
 from ussd.graph import Link, Vertex
 import typing
+from ussd.screens.schema import UssdTextSchema, UssdContentBaseSchema, NextUssdScreenSchema, MenuOptionSchema, NextUssdScreenField
+from marshmallow import fields
 
 
-class InputValidatorSerializer(UssdTextSerializer):
-    regex = serializers.CharField(max_length=255, required=False)
-    expression = serializers.CharField(max_length=255, required=False)
-
-    def validate(self, data):
-        return super(InputValidatorSerializer, self).validate(data)
+class InputValidatorSchema(UssdTextSchema):
+    regex = fields.Str(required=False)
+    expression = fields.Str(required=False)
 
 
-class InputSerializer(UssdContentBaseSerializer, NextUssdScreenSerializer):
-    input_identifier = serializers.CharField(max_length=100)
-    validators = serializers.ListField(
-        child=InputValidatorSerializer(),
-        required=False
-    )
-    options = serializers.ListField(
-        child=MenuOptionSerializer(),
-        required=False
-    )
+class InputSchema(UssdContentBaseSchema, NextUssdScreenSchema):
+    input_identifier = fields.Str(required=True)
+    validators = fields.List(fields.Nested(InputValidatorSchema), required=False)
+    options = fields.List(fields.Nested(MenuOptionSchema), required=False)
+    default_next_screen = NextUssdScreenField(required=False)
 
 
 class InputScreen(MenuScreen):
@@ -68,7 +59,7 @@ class InputScreen(MenuScreen):
     """
 
     screen_type = "input_screen"
-    serializer = InputSerializer
+    serializer = InputSchema
 
     def handle_invalid_input(self):
         # validate input

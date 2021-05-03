@@ -1,53 +1,27 @@
 from ussd.core import UssdHandlerAbstract, UssdResponse
-from .serializers import UssdContentBaseSerializer, \
-    MenuOptionSerializer, NextUssdScreenSerializer, UssdTextSerializer
-from rest_framework.serializers import ListField, ValidationError, \
-    CharField
-from django.core.paginator import Paginator
+from ussd.paginator import Paginator
 import textwrap
-from django.conf import settings
-from ussd import defaults
 from ussd.graph import Link, Vertex
 import typing
+from marshmallow import validates_schema, fields, ValidationError
+from ussd.screens.schema import UssdContentBaseSchema, \
+    MenuOptionSchema, NextUssdScreenSchema, \
+    UssdTextSchema, UssdTextField, WithDictSchema, WithItemSchema, PaginationConfigSchema
 
 
-class WithItemField(CharField):
-    def to_internal_value(self, data):
-        if isinstance(data, list):
-            return data
-        return super(WithItemField, self).to_internal_value(data)
+class ItemsSchema(UssdTextSchema, NextUssdScreenSchema, WithDictSchema, WithItemSchema):
+    value = fields.Str(required=True)
+    session_key = fields.Str(required=True)
 
-
-class WithDictField(CharField):
-    def to_internal_value(self, data):
-        if isinstance(data, dict):
-            return data
-        return super(WithDictField, self).to_internal_value(data)
-
-
-class ItemsSerializer(UssdTextSerializer, NextUssdScreenSerializer):
-    value = CharField()
-    session_key = CharField()
-    with_items = WithItemField(required=False, default=None)
-    with_dict = WithDictField(required=False, default=None)
-
-    def to_internal_value(self, data):
-        # set data in instance to access later
-        self.custom_data = data
-        return super(ItemsSerializer, self).to_internal_value(data)
-
-    def validate_with_items(self, value, loop_value='with_dict'):
-        if value is None and self.custom_data.get(loop_value, None) is None:
+    @validates_schema(pass_many=True, skip_on_field_errors=False)
+    def validate_options(self, data, **kwargs):
+        if 'with_items' not in data and 'with_dict' not in data:
             raise ValidationError(
                 "with_items or with_dict field is required"
             )
-        return value
-
-    def validate_with_dict(self, value):
-        return self.validate_with_items(value, 'with_items')
 
 
-class MenuScreenSerializer(UssdContentBaseSerializer):
+class MenuScreenSchema(UssdContentBaseSchema):
     """
     - text:
         .. autoclass:: UssdContentBaseSerializer
@@ -71,18 +45,19 @@ class MenuScreenSerializer(UssdContentBaseSerializer):
 
         .. literalinclude:: .././ussd/tests/sample_screen_definition/valid_menu_screen_conf.yml
     """
-    options = ListField(
-        child=MenuOptionSerializer(),
+    options = fields.List(
+        fields.Nested(MenuOptionSchema),
         required=False
     )
-    items = ItemsSerializer(required=False)
+    items = fields.Nested(ItemsSchema, required=False)
+    error_message = UssdTextField(required=False)
+    pagination_config = fields.Nested(PaginationConfigSchema, required=False)
 
-    def validate(self, data):
+    @validates_schema
+    def validate_options(self, data, **kwargs):
         if 'options' not in data and 'items' not in data:
             raise ValidationError(
-                'options field is required or items is required'
-            )
-        return super(MenuScreenSerializer, self).validate(data)
+                'options field is required or items is required')
 
 
 class ListItem(object):
@@ -171,7 +146,7 @@ class MenuScreen(UssdHandlerAbstract):
         .. literalinclude:: .././ussd/tests/sample_screen_definition/valid_menu_screen_conf.yml
     """
     screen_type = "menu_screen"
-    serializer = MenuScreenSerializer
+    serializer = MenuScreenSchema
 
     def __init__(self, *args, **kwargs):
         super(MenuScreen, self).__init__(*args, **kwargs)
@@ -194,9 +169,9 @@ class MenuScreen(UssdHandlerAbstract):
     def show_ussd_content(self):
         if not self.raw_text:
             self.ussd_request.session['_ussd_state']['page'] = 1
-        return self._render_django_page(1)
+        return self._render_page(1)
 
-    def _render_django_page(self, index):
+    def _render_page(self, index):
         return self.paginator.page(index).object_list[0]
 
     def get_paginator(self):
@@ -280,13 +255,13 @@ class MenuScreen(UssdHandlerAbstract):
                 new_page_number = page.next_page_number()
                 self.ussd_request.session['_ussd_state']['page'] = \
                     new_page_number
-                return UssdResponse(self._render_django_page(new_page_number))
+                return UssdResponse(self._render_page(new_page_number))
             elif self.ussd_request.input.strip() == '00' and \
                     page.has_previous():
                 new_page_number = page.previous_page_number()
                 self.ussd_request.session['_ussd_state']['page'] = \
                     new_page_number
-                return UssdResponse(self._render_django_page(new_page_number))
+                return UssdResponse(self._render_page(new_page_number))
         next_screen = self.evaluate_input()
         if next_screen:
             return self.route_options(next_screen)
@@ -354,7 +329,7 @@ class MenuScreen(UssdHandlerAbstract):
             input_value = option.get('input_value') or i
             input_display = option.get('input_display') or "{index}{index_format}".format(
                 index=input_value,
-                index_format=getattr(settings, 'USSD_INDEX_FORMAT', defaults.index_format)
+                index_format=self.ussd_request.menu_index_format
             )
 
             text = "{display_option}{text}".format(
@@ -378,7 +353,7 @@ class MenuScreen(UssdHandlerAbstract):
         return UssdResponse(
             self._add_end_line(
                 self.get_text(self.error_message)) +
-            self._render_django_page(1)
+            self._render_page(1)
         )
 
     def _with_items(self, text, value, items, start_index):
@@ -401,7 +376,7 @@ class MenuScreen(UssdHandlerAbstract):
 
             index_text = "{index}{index_format}".format(
                 index=index,
-                index_format=getattr(settings, 'USSD_INDEX_FORMAT', defaults.index_format))
+                index_format=self.ussd_request.menu_index_format)
 
             list_items.append(
                 ListItem(
