@@ -1,3 +1,5 @@
+from structlog import get_logger
+
 from ussd import screens
 from ussd.filters import date_filters
 from ussd.filters import dict_filters
@@ -9,6 +11,9 @@ import pkgutil
 
 path_name = screens.__path__[0]
 package_name = screens.__name__
+
+
+logger = get_logger(__name__)
 
 
 def get_all_screens_module(path_name, package_name, package_list=None):
@@ -24,11 +29,11 @@ def get_all_screens_module(path_name, package_name, package_list=None):
 loaded_screens = get_all_screens_module(path_name, package_name)
 
 for i in loaded_screens:
-    print("loaded screens:", i)
-print("loading filters")
+    logger.debug(f"loaded screens:{i}")
+logger.debug("loading filters")
 
 env.filters.update(_registered_filters)
 
 env.globals.update(_built_in_functions)
 
-print("loading ussd init")
+logger.info("loading ussd init")

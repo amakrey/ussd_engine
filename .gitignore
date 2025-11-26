@@ -22,6 +22,8 @@ lib64/
 parts/
 sdist/
 var/
+session_data/
+session_data_test/
 *.egg-info/
 .installed.cfg
 *.egg

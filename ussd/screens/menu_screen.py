@@ -13,7 +13,7 @@ class ItemsSchema(UssdTextSchema, NextUssdScreenSchema, WithDictSchema, WithItem
     value = fields.Str(required=True)
     session_key = fields.Str(required=True)
 
-    @validates_schema(pass_many=True, skip_on_field_errors=False)
+    @validates_schema(pass_collection=True, skip_on_field_errors=False)
     def validate_options(self, data, **kwargs):
         if 'with_items' not in data and 'with_dict' not in data:
             raise ValidationError(

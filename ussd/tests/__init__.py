@@ -2,7 +2,6 @@ import json
 import os
 import uuid
 
-
 from unittest import TestCase
 from ussd.core import render_journey_as_graph, render_journey_as_mermaid_text, UssdEngine, UssdRequest, UssdResponse
 from ussd.tests.sample_screen_definition import path
@@ -22,7 +21,10 @@ class UssdTestCase(object):
         session_store = FilesystemStore("./session_data")
 
         def setUp(self):
-            self.journey_store = YamlJourneyStore("/usr/src/app/ussd/tests/sample_screen_definition")
+            self.journey_store = YamlJourneyStore(
+                user="",
+                journey_directory="./ussd/tests/sample_screen_definition"
+            )
 
             file_prefix = self.__module__.split('.')[-1].replace('test_', '')
             self.journey_name = file_prefix
@@ -67,10 +69,11 @@ class UssdTestCase(object):
         def testing_invalid_customer_journey(self):
 
             try:
-                self._test_ussd_validation(self.invalid_version, False,
-                                       getattr(self,
-                                               "validation_error_message",
-                                               {}))
+                self._test_ussd_validation(
+                    self.invalid_version, False,
+                    getattr(self,
+                            "validation_error_message",
+                            {}))
             except Exception as e:
                 if not (hasattr(self, "expected_error") and isinstance(e, self.__getattribute__("expected_error"))):
                     raise e

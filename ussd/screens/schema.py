@@ -1,13 +1,23 @@
+from typing import List, Mapping, Any, TypedDict
+
 from marshmallow import Schema, fields, validates, ValidationError, validate
+from marshmallow.experimental.context import Context
+
 from ussd.screens.fields import UssdTextField, NextUssdScreenField, WithDictField, WithItemField
-from typing import List, Mapping, Any
+
+
+class UssdContentContext(TypedDict):
+    ussd_context: dict
+
+
+UssdScreenSchemaContext = Context[UssdContentContext]
 
 
 class UssdBaseScreenSchema(Schema):
     type = fields.Str(required=True)
 
     @validates("type")
-    def validate_type(self, value):
+    def validate_type(self, value, **kwargs):
         # to avoid cyclic import
         from ussd.core import _registered_ussd_handlers
         if value not in _registered_ussd_handlers.keys():
@@ -27,14 +37,14 @@ class NextUssdScreenSchema(Schema):
     next_screen = NextUssdScreenField(required=True)
 
     @validates("next_screen")
-    def validate_next_screen(self, value):
+    def validate_next_screen(self, value, **kwargs):
         for next_screen_config in value:
             next_screen = next_screen_config.get('next_screen')
             if not next_screen:
                 raise ValidationError(
                     {'next_screen': ['This field is required.']}
                 )
-            if next_screen not in self.context.keys():
+            if next_screen not in UssdScreenSchemaContext.get()['ussd_content'].keys():
                 raise ValidationError(
                     "{screen} is missing in ussd journey".format(screen=next_screen)
                 )
@@ -51,14 +61,15 @@ class MenuSchema(Schema):
 
 
 class WithItemSchema(Schema):
-    with_items = WithItemField(required=False, default=None)
+    with_items = WithItemField(required=False, dump_default=None)
 
 
 class WithDictSchema(Schema):
-    with_dict = WithDictField(required=False, default=None)
+    with_dict = WithDictField(required=False, dump_default=None)
+
 
 class PaginationConfigSchema(Schema):
-    ussd_text_limit = fields.Integer(required=False, default=180)
+    ussd_text_limit = fields.Integer(required=False, dump_default=180)
     more_option = UssdTextField(required=False)
     back_option = UssdTextField(required=False)
 
@@ -71,7 +82,7 @@ class UnionField(fields.Field):
         super().__init__(*args, **kwargs)
 
     def _deserialize(
-        self, value: Any, attr: str = None, data: Mapping[str, Any] = None, **kwargs
+            self, value: Any, attr: str = None, data: Mapping[str, Any] = None, **kwargs
     ):
         """
         _deserialize defines a custom Marshmallow Schema Field that takes in mutli-type input data to

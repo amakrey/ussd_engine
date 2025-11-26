@@ -28,8 +28,8 @@ class UssdReportSessionSchema(Schema):
 
 class InitialScreenSchema(UssdBaseScreenSchema, NextUssdScreenSchema):
     variables = fields.Nested(VariableDefinitionSchema, required=False)
-    create_ussd_variables = fields.Dict(default={}, required=False)
-    default_language = fields.Str(required=False, default="en")
+    create_ussd_variables = fields.Dict(dump_default={}, required=False)
+    default_language = fields.Str(required=False, dump_default="en")
     ussd_report_session = fields.Nested(UssdReportSessionSchema, required=False)
     pagination_config = fields.Nested(PaginationConfigSchema, required=False)
 
@@ -146,9 +146,10 @@ class InitialScreen(UssdHandlerAbstract):
 
             # call report session
             if self.screen_content.get('ussd_report_session'):
-                self.fire_ussd_report_session_task(self.initial_screen,
-                                                   self.ussd_request.session_id
-                                                   )
+                self.fire_ussd_report_session_task(
+                    self.initial_screen,
+                    self.ussd_request.session_id
+                )
         else:
             next_screen = self.screen_content
         return self.route_options(route_options=next_screen)
@@ -158,10 +159,11 @@ class InitialScreen(UssdHandlerAbstract):
                 self.screen_content.get('create_ussd_variables', {}). \
                         items():
             self.ussd_request.session[key] = \
-                self.evaluate_jija_expression(value,
-                                              lazy_evaluating=True,
-                                              session=self.ussd_request.session
-                                              )
+                self.evaluate_jija_expression(
+                    value,
+                    lazy_evaluating=True,
+                    session=self.ussd_request.session
+                )
 
     def set_language(self):
         self.ussd_request.session['default_language'] = \

@@ -1,6 +1,7 @@
 """
 Comming soon
 """
+import datetime
 import inspect
 import json
 import os
@@ -8,24 +9,23 @@ import re
 import typing
 from collections import namedtuple
 from copy import copy
-import datetime
 from urllib.parse import unquote
 
 import requests
 from jinja2 import Environment
+from marshmallow.schema import SchemaMeta
+from simplekv import KeyValueStore
+from simplekv.fs import FilesystemStore
 from structlog import get_logger
 
 from ussd import defaults as ussd_airflow_variables
 from ussd import utilities
-from ussd.tasks import report_session
-from .graph import Graph, Link, Vertex, convert_graph_to_mermaid_text
-from ussd.screens.schema import UssdBaseScreenSchema
+from ussd.screens.schema import UssdBaseScreenSchema, UssdScreenSchemaContext
+from ussd.session_store import SessionStore
 from ussd.store.journey_store import JourneyStore
 from ussd.store.journey_store.YamlJourneyStore import YamlJourneyStore
-from simplekv import KeyValueStore
-from simplekv.fs import FilesystemStore
-from ussd.session_store import SessionStore
-from marshmallow.schema import SchemaMeta
+from ussd.tasks import report_session
+from .graph import Graph, Link, Vertex, convert_graph_to_mermaid_text
 
 _registered_ussd_handlers = {}
 _registered_filters = {}
@@ -361,7 +361,7 @@ class UssdHandlerAbstract(object, metaclass=UssdHandlerMetaClass):
                 )
 
             for option in route_options:
-                if self.evaluate_jija_expression(
+                if hasattr(option, 'get') and self.evaluate_jija_expression(
                         option.get('expression') or option['condition'],
                         session=self.ussd_request.session,
                         extra_context=extra_context
@@ -409,7 +409,7 @@ class UssdHandlerAbstract(object, metaclass=UssdHandlerMetaClass):
 
         template = env.from_string(text or '')
         text = template.render(context)
-        return json.dumps(text) if encode is 'json' else text
+        return json.dumps(text) if encode == 'json' else text
 
     def get_text(self, text_context=None):
         text_context = self.screen_content.get('text') \
@@ -457,8 +457,9 @@ class UssdHandlerAbstract(object, metaclass=UssdHandlerMetaClass):
     @classmethod
     def validate(cls, screen_name: str, ussd_content: dict) -> (bool, dict):
         screen_content = ussd_content[screen_name]
-        schema = cls.serializer(context=ussd_content)
-        errors = schema.validate(screen_content)
+        schema = cls.serializer()
+        with UssdScreenSchemaContext({"ussd_content": ussd_content}):
+            errors = schema.validate(screen_content)
         return False if errors else True, errors
 
     @staticmethod
@@ -749,7 +750,7 @@ class UssdEngine(object):
             screen_type = screen_content.get('type')
 
             # all screen should have type field.
-            base_schema = UssdBaseScreenSchema(context=ussd_content)
+            base_schema = UssdBaseScreenSchema()
             base_errors = base_schema.validate(dict(type=screen_type))
 
             if base_errors:
